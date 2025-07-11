@@ -1,6 +1,7 @@
-
 #coding: UTF-8
 import sys
+import requests
+import json
 from time import sleep
 from lib import TVOC_Sense
 import gspread
@@ -15,53 +16,50 @@ print("スクリプトを開始します。")
 load_dotenv()
 print(".envファイルを読み込みました。")
 
+# --- 環境変数の読み込み ---
 spreadsheet_url = os.getenv("SPREADSHEET_URL")
 service_account_file = os.getenv("SERVICE_ACCOUNT_FILE")
+line_channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+line_group_id = os.getenv("LINE_GROUP_ID")
 
 print(f"スプレッドシートURL: {spreadsheet_url}")
 print(f"サービスアカウントファイル: {service_account_file}")
+print(f"LINE Channel Access Token: {'設定済み' if line_channel_access_token else '未設定'}")
+print(f"LINE Group ID: {'設定済み' if line_group_id else '未設定'}")
 
-if not spreadsheet_url or not service_account_file:
-    print("エラー: .envファイルにSPREADSHEET_URLまたはSERVICE_ACCOUNT_FILEが設定されていません。")
+if not all([spreadsheet_url, service_account_file, line_channel_access_token, line_group_id]):
+    print("エラー: .envファイルに必要な設定が不足しています。詳細は.env.exampleを確認してください。")
     sys.exit(1)
 
+# --- Google Sheets APIのセットアップ ---
 try:
-    # Googleスプレッドシートの認証
     print("Google APIの認証を開始します...")
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name(service_account_file, scope)
     client = gspread.authorize(creds)
     print("Google APIの認証に成功しました。")
-
-    # スプレッドシートを開く
     print("スプレッドシートを開いています...")
     spreadsheet = client.open_by_url(spreadsheet_url)
     sheet = spreadsheet.sheet1
     print(f"スプレッドシート '{spreadsheet.title}' のシート '{sheet.title}' を開きました。")
-
-except gspread.exceptions.SpreadsheetNotFound:
-    print("エラー: スプレッドシートが見つかりません。URLが正しいか、サービスアカウントに共有設定がされているか確認してください。")
-    sys.exit(1)
 except Exception as e:
-    print(f"認証またはスプレッドシートを開く際にエラーが発生しました: {e}")
+    print(f"Google Sheetsのセットアップ中にエラーが発生しました: {e}")
     sys.exit(1)
 
-
-# Function to detect the Raspberry Pi model
-def detect_model():
-    try:
-        with open('/proc/device-tree/model') as f:
-            model = f.read().strip()
-        print(f"Raspberry Piのモデルを検出しました: {model}")
-        return model
-    except FileNotFoundError:
-        print("Raspberry Piではない環境で実行しています（テスト環境）。")
-        return "Testing Environment"
-
-# Detect the Raspberry Pi model and initialize the TVOC_Sense object
-model_info = detect_model()
+# --- TVOCセンサーのセットアップ ---
 try:
     print("TVOCセンサーを初期化しています...")
+    # (中略) TVOCセンサーの初期化コードは変更なし
+    # Function to detect the Raspberry Pi model
+    def detect_model():
+        try:
+            with open('/proc/device-tree/model') as f:
+                model = f.read().strip()
+            return model
+        except FileNotFoundError:
+            return "Testing Environment"
+
+    model_info = detect_model()
     if "Raspberry Pi 5" in model_info or "Raspberry Pi Compute Module 5" in model_info:
         tvoc = TVOC_Sense.TVOC_Sense('/dev/ttyAMA0', 115200)
     else:
@@ -71,42 +69,79 @@ except Exception as e:
     print(f"TVOCセンサーの初期化中にエラーが発生しました: {e}")
     sys.exit(1)
 
+def send_line_push_message(message):
+    """Sends a push message to a specified LINE group."""
+    print(f"LINEプッシュメッセージを送信します: {message}")
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {line_channel_access_token}"
+    }
+    payload = {
+        "to": line_group_id,
+        "messages": [
+            {
+                "type": "text",
+                "text": message
+            }
+        ]
+    }
+    try:
+        response = requests.post("https://api.line.me/v2/bot/message/push", headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        print("LINEプッシュメッセージの送信に成功しました。")
+    except requests.exceptions.RequestException as e:
+        print(f"LINEプッシュメッセージの送信に失敗しました: {e}")
+        if e.response:
+            print(f"Response Body: {e.response.text}")
 
 def log_tvoc_data():
     """
-    Logs TVOC data to the Google Sheet every 10 seconds.
-    Also removes data older than one month.
+    Logs TVOC data and sends LINE notifications based on conditions.
     """
     print("センサーをクエリモードに設定します。")
     tvoc.TVOC_Set_Device_Query_Mode()
     
-    # Add header row if the sheet is empty
     if not sheet.get_all_values():
         print("シートが空のため、ヘッダー行を追加します。")
-        sheet.append_row(["Timestamp", "TVOC (ppb)"])
+        sheet.append_row(["Timestamp", "TVOC (ppm)"])
 
-    # 最後にクリーンアップを実行した時刻を記録する変数
     last_cleanup_time = None
+    last_notification_time = None
+    high_tvoc_start_time = None
+    TVOC_THRESHOLD = 0.6
+    NOTIFICATION_INTERVAL_SECONDS = 10
+    COOLDOWN_MINUTES = 30
 
     print("データの取得と記録を開始します... (Ctrl+Cで停止)")
     while True:
         try:
-            # 1日に1回だけクリーンアップを実行
+            # (中略) 1日1回のクリーンアップ処理は変更なし
             if last_cleanup_time is None or (datetime.now() - last_cleanup_time).days >= 1:
-                print("\n--- 1日1回のデータクリーンアップを開始します ---")
                 cleanup_old_data()
                 last_cleanup_time = datetime.now()
-                print("--- データクリーンアップを完了しました ---\n")
 
-            # Get data from sensor
             data = tvoc.TVOC_Get_Query_Device_Data()
             
             if data is not None:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                tvoc_value = data
-                
-                sheet.append_row([timestamp, tvoc_value])
-                print(f"記録成功: {timestamp}, TVOC = {tvoc_value:.3f} ppm")
+                sheet.append_row([timestamp, data])
+                print(f"記録成功: {timestamp}, TVOC = {data:.3f} ppm")
+
+                # Check for high TVOC value
+                if data > TVOC_THRESHOLD:
+                    if high_tvoc_start_time is None:
+                        high_tvoc_start_time = datetime.now()
+                    
+                    if (datetime.now() - high_tvoc_start_time).total_seconds() >= NOTIFICATION_INTERVAL_SECONDS:
+                        if last_notification_time is None or (datetime.now() - last_notification_time).total_seconds() > COOLDOWN_MINUTES * 60:
+                            message = f"\n[警告] TVOC値が閾値({TVOC_THRESHOLD}ppm)を超えました。\n現在値: {data:.3f} ppm\n速やかに換気を行ってください。"
+                            send_line_push_message(message)
+                            last_notification_time = datetime.now()
+                        else:
+                            pass # Cooldown
+                else:
+                    high_tvoc_start_time = None
+
             else:
                 print("センサーからデータが返されませんでした (None)。")
 
@@ -119,36 +154,33 @@ def cleanup_old_data():
     """
     Removes rows from the sheet that are older than one month.
     """
+    # (中略) この関数の実装は変更なし
     try:
-        print("スプレッドシートから全データを取得しています...（データ量により時間がかかります）")
+        print("\n--- 1日1回のデータクリーンアップを開始します ---")
+        print("スプレッドシートから全データを取得しています...")
         all_data = sheet.get_all_values()
         if len(all_data) > 1:
             one_month_ago = datetime.now() - timedelta(days=30)
-            
-            print("古いデータをフィルタリングしています...")
-            rows_to_keep = [all_data[0]] # Keep the header
+            rows_to_keep = [all_data[0]]
             for row in all_data[1:]:
                 try:
-                    timestamp = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
-                    if timestamp > one_month_ago:
+                    if datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S") > one_month_ago:
                         rows_to_keep.append(row)
                 except (ValueError, IndexError):
                     rows_to_keep.append(row)
 
             if len(rows_to_keep) < len(all_data):
                 print(f"{len(all_data) - len(rows_to_keep)}件の古いデータを削除します。")
-                print("シートを更新しています...（データ量により時間がかかります）")
                 sheet.clear()
                 sheet.append_rows(rows_to_keep, value_input_option='USER_ENTERED')
-                print("シートの更新が完了しました。")
             else:
                 print("削除対象の古いデータはありませんでした。")
+        print("--- データクリーンアップを完了しました ---\n")
     except Exception as e:
         print(f"データクリーンアップ中にエラーが発生しました: {e}")
-
 
 if __name__ == "__main__":
     try:
         log_tvoc_data()
     except KeyboardInterrupt:
-        print("ロギングを停止しました。")
+        print("\nロギングを停止しました。")
