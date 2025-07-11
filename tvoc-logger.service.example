@@ -13,6 +13,9 @@ Group=pi
 # .envファイルなどを正しく読み込むために重要です
 WorkingDirectory=/home/pi/tvoc
 
+# サービスの実行前に少し待機します。ハードウェアの初期化待ちに有効です。
+ExecStartPre=/bin/sleep 15
+
 # 実行するコマンドをフルパスで指定します
 # 仮想環境(.venv)内のPythonを使用するようにしてください
 ExecStart=/home/pi/tvoc/.venv/bin/python3 /home/pi/tvoc/log_tvoc.py

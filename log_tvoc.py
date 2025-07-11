@@ -13,8 +13,11 @@ from datetime import datetime, timedelta
 print("スクリプトを開始します。")
 
 # .envファイルから環境変数を読み込む
-load_dotenv()
-print(".envファイルを読み込みました。")
+# スクリプト自身の場所を基準に.envファイルの絶対パスを生成し、読み込みの失敗を防ぎます
+script_dir = os.path.dirname(os.path.abspath(__file__))
+dotenv_path = os.path.join(script_dir, '.env')
+load_dotenv(dotenv_path=dotenv_path)
+print(f".envファイル({dotenv_path})を読み込みました。")
 
 # --- 環境変数の読み込み ---
 spreadsheet_url = os.getenv("SPREADSHEET_URL")

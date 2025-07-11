@@ -1,3 +1,7 @@
 gspread
 python-dotenv
 oauth2client
+pyserial
+gpiozero
+RPi.GPIO
+lgpio
