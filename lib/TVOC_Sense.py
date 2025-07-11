@@ -145,7 +145,9 @@ class TVOC_Sense:
                 if self.alm.is_pressed:
                     print("TVOC has exceeded 2ppm")
 
-                print("ADC =", adc, "TVOC = %0.3fppm" % tvoc)
+                return tvoc
             else:
                 print("Verification failed.")
+                return None
             self.check_sum = 0  # Clear checksum
+        return None
