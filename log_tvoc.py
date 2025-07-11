@@ -1,3 +1,4 @@
+
 #coding: UTF-8
 import sys
 from time import sleep
@@ -84,31 +85,34 @@ def log_tvoc_data():
         print("シートが空のため、ヘッダー行を追加します。")
         sheet.append_row(["Timestamp", "TVOC (ppb)"])
 
+    # 最後にクリーンアップを実行した時刻を記録する変数
+    last_cleanup_time = None
+
     print("データの取得と記録を開始します... (Ctrl+Cで停止)")
     while True:
         try:
+            # 1日に1回だけクリーンアップを実行
+            if last_cleanup_time is None or (datetime.now() - last_cleanup_time).days >= 1:
+                print("\n--- 1日1回のデータクリーンアップを開始します ---")
+                cleanup_old_data()
+                last_cleanup_time = datetime.now()
+                print("--- データクリーンアップを完了しました ---\n")
+
             # Get data from sensor
-            print("センサーからデータをクエリしています...")
             data = tvoc.TVOC_Get_Query_Device_Data()
             
             if data is not None:
-                print(f"センサーからデータを取得しました: {data}")
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 tvoc_value = data
                 
-                print(f"スプレッドシートに行を追加しています: {[timestamp, tvoc_value]}")
                 sheet.append_row([timestamp, tvoc_value])
-                print(f"記録成功: {timestamp}, {tvoc_value} ppb")
-
-                # Clean up old data
-                cleanup_old_data()
+                print(f"記録成功: {timestamp}, TVOC = {tvoc_value:.3f} ppm")
             else:
                 print("センサーからデータが返されませんでした (None)。")
 
         except Exception as e:
             print(f"ループ内でエラーが発生しました: {e}")
 
-        print("10秒待機します...")
         sleep(10)
 
 def cleanup_old_data():
@@ -116,11 +120,13 @@ def cleanup_old_data():
     Removes rows from the sheet that are older than one month.
     """
     try:
+        print("スプレッドシートから全データを取得しています...（データ量により時間がかかります）")
         all_data = sheet.get_all_values()
         if len(all_data) > 1:
             one_month_ago = datetime.now() - timedelta(days=30)
             
-            rows_to_keep = [all_data[0]]
+            print("古いデータをフィルタリングしています...")
+            rows_to_keep = [all_data[0]] # Keep the header
             for row in all_data[1:]:
                 try:
                     timestamp = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
@@ -130,10 +136,13 @@ def cleanup_old_data():
                     rows_to_keep.append(row)
 
             if len(rows_to_keep) < len(all_data):
-                print("古いデータをクリーンアップしています...")
+                print(f"{len(all_data) - len(rows_to_keep)}件の古いデータを削除します。")
+                print("シートを更新しています...（データ量により時間がかかります）")
                 sheet.clear()
-                sheet.append_rows(rows_to_keep)
-                print("クリーンアップが完了しました。")
+                sheet.append_rows(rows_to_keep, value_input_option='USER_ENTERED')
+                print("シートの更新が完了しました。")
+            else:
+                print("削除対象の古いデータはありませんでした。")
     except Exception as e:
         print(f"データクリーンアップ中にエラーが発生しました: {e}")
 
