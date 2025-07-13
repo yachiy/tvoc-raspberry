@@ -130,7 +130,7 @@ def log_tvoc_data():
                 print("センサーからデータが返されませんでした (None)。")
         except Exception as e:
             print(f"ループ内でエラーが発生しました: {e}")
-        sleep(10)
+        sleep(300)
 
 # --- データクリーンアップ関数 (変更なし) ---
 def cleanup_old_data():

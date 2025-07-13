@@ -63,7 +63,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`requirements.txt`には、`gspread`, `python-dotenv`, `oauth2client`, `pyserial`, `gpiozero`, `RPi.GPIO` が含まれていることを確認してください。
+`requirements.txt`には、`gspread`, `python-dotenv`, `oauth2client`, `pyserial`, `gpiozero`, `RPi.GPIO`, `lgpio` が含まれていることを確認してください。
 
 ### 4. 環境設定ファイルの作成
 

@@ -24,6 +24,9 @@ ExecStart=/home/pi/tvoc/.venv/bin/python3 /home/pi/tvoc/log_tvoc.py
 Restart=always
 RestartSec=10
 
+StandardOutput=journal
+StandardError=journal
+
 [Install]
 # システム起動時にサービスが有効になるようにします
 WantedBy=multi-user.target
