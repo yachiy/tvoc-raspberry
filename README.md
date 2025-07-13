@@ -108,6 +108,7 @@ Raspberry Pi起動時に自動で実行するには、`systemd`にサービス�
     sudo cp tvoc-logger.service.example /etc/systemd/system/tvoc-logger.service
     ```
     ※ファイル内のパス(`/home/pi/tvoc`)は、実際のプロジェクトのパスに合わせて適宜修正してください。
+    ※サービスファイル内の`RestartSec=10`は、エラー発生時に10秒後に自動で再起動するための設定です。必要に応じてこの秒数を変更できます。
 
 2.  **サービスの有効化と開始**:
     ```bash

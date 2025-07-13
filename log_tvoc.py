@@ -108,6 +108,7 @@ def log_tvoc_data():
     NOTIFICATION_INTERVAL_SECONDS = 7200
     print("データの取得と記録を開始します... (Ctrl+Cで停止)")
     while True:
+        sleep_duration = 10  # デフォルトは10秒（失敗時のリトライ間隔）
         try:
             if last_cleanup_time is None or (datetime.now() - last_cleanup_time).days >= 1:
                 cleanup_old_data()
@@ -121,16 +122,19 @@ def log_tvoc_data():
                     if high_tvoc_start_time is None: high_tvoc_start_time = datetime.now()
                     if (datetime.now() - high_tvoc_start_time).total_seconds() >= NOTIFICATION_INTERVAL_SECONDS:
                         if last_notification_time is None or (datetime.now() - last_notification_time).total_seconds() > 7200:
-                            message = f"\n[警告] TVOC値が閾値({TVOC_THRESHOLD}ppm)を2時間以上超え続けています。\n現在値: {data:.3f} ppm\n速やかに換気を行ってください."
+                            message = f"\n[警告] TVOC値が閾値({TVOC_THRESHOLD}ppm)を2時間以上超え続けています.\n現在値: {data:.3f} ppm\n速やかに換気を行ってください."
                             send_line_push_message(message)
                             last_notification_time = datetime.now()
                 else:
                     high_tvoc_start_time = None
+                sleep_duration = 300  # 成功時は5分待機
             else:
                 print("センサーからデータが返されませんでした (None)。")
         except Exception as e:
             print(f"ループ内でエラーが発生しました: {e}")
-        sleep(300)
+        
+        print(f"{sleep_duration}秒待機します...")
+        sleep(sleep_duration)
 
 # --- データクリーンアップ関数 (変更なし) ---
 def cleanup_old_data():
