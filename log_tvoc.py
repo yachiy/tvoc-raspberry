@@ -104,7 +104,7 @@ def log_tvoc_data():
     last_cleanup_time = None
     high_tvoc_start_time = None
     last_notification_time = None
-    TVOC_THRESHOLD = 0.6
+    TVOC_THRESHOLD = 1.0
     NOTIFICATION_INTERVAL_SECONDS = 7200
     print("データの取得と記録を開始します... (Ctrl+Cで停止)")
     while True:
