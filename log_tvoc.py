@@ -102,11 +102,10 @@ def log_tvoc_data():
         print("シートが空のため、ヘッダー行を追加します。")
         sheet.append_row(["Timestamp", "TVOC (ppm)"])
     last_cleanup_time = None
-    last_notification_time = None
     high_tvoc_start_time = None
+    last_notification_time = None
     TVOC_THRESHOLD = 0.6
-    NOTIFICATION_INTERVAL_SECONDS = 10
-    COOLDOWN_MINUTES = 30
+    NOTIFICATION_INTERVAL_SECONDS = 7200
     print("データの取得と記録を開始します... (Ctrl+Cで停止)")
     while True:
         try:
@@ -121,8 +120,8 @@ def log_tvoc_data():
                 if data > TVOC_THRESHOLD:
                     if high_tvoc_start_time is None: high_tvoc_start_time = datetime.now()
                     if (datetime.now() - high_tvoc_start_time).total_seconds() >= NOTIFICATION_INTERVAL_SECONDS:
-                        if last_notification_time is None or (datetime.now() - last_notification_time).total_seconds() > COOLDOWN_MINUTES * 60:
-                            message = f"\n[警告] TVOC値が閾値({TVOC_THRESHOLD}ppm)を超えました。\n現在値: {data:.3f} ppm\n速やかに換気を行ってください。"
+                        if last_notification_time is None or (datetime.now() - last_notification_time).total_seconds() > 7200:
+                            message = f"\n[警告] TVOC値が閾値({TVOC_THRESHOLD}ppm)を2時間以上超え続けています。\n現在値: {data:.3f} ppm\n速やかに換気を行ってください."
                             send_line_push_message(message)
                             last_notification_time = datetime.now()
                 else:
