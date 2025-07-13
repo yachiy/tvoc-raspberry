@@ -41,7 +41,7 @@ def tvoc_query_print():
     tvoc.TVOC_Set_Device_Query_Mode()  # Set sensor to query mode
     while True:
         tvoc.TVOC_Get_Query_Device_Data()  # Request and print data in query mode
-        sleep(1)  # Delay between queries (1 second)
+        sleep(300)  # Delay between queries (5 minutes)
 try:
     # tvoc_active_print()  # Uncomment to use active mode
     tvoc_query_print()  # Uncomment to use query mode
