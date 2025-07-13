@@ -107,6 +107,8 @@ def log_tvoc_data():
     TVOC_THRESHOLD = 1.0
     NOTIFICATION_INTERVAL_SECONDS = 7200
     print("データの取得と記録を開始します... (Ctrl+Cで停止)")
+    failure_count = 0
+    last_failure_notification_time = None
     while True:
         sleep_duration = 10  # デフォルトは10秒（失敗時のリトライ間隔）
         try:
@@ -115,6 +117,7 @@ def log_tvoc_data():
                 last_cleanup_time = datetime.now()
             data = tvoc.TVOC_Get_Query_Device_Data()
             if data is not None:
+                failure_count = 0  # 成功時に失敗カウントをリセット
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 sheet.append_row([timestamp, data])
                 print(f"記録成功: {timestamp}, TVOC = {data:.3f} ppm")
@@ -129,9 +132,22 @@ def log_tvoc_data():
                     high_tvoc_start_time = None
                 sleep_duration = 300  # 成功時は5分待機
             else:
-                print("センサーからデータが返されませんでした (None)。")
+                failure_count += 1
+                print(f"センサーからデータが返されませんでした (None)。連続失敗: {failure_count}回")
+                if failure_count >= 10:
+                    if last_failure_notification_time is None or (datetime.now() - last_failure_notification_time).total_seconds() > 7200:
+                        message = f"\n[エラー] センサーからのデータ取得に10回以上連続で失敗しました。\n機器の接続や状態を確認してください。"
+                        send_line_push_message(message)
+                        last_failure_notification_time = datetime.now()
+
         except Exception as e:
-            print(f"ループ内でエラーが発生しました: {e}")
+            failure_count += 1
+            print(f"ループ内でエラーが発生しました: {e}。連続失敗: {failure_count}回")
+            if failure_count >= 10:
+                if last_failure_notification_time is None or (datetime.now() - last_failure_notification_time).total_seconds() > 7200:
+                    message = f"\n[エラー] センサーからのデータ取得に10回以上連続で失敗しました。\n機器の接続や状態を確認してください。"
+                    send_line_push_message(message)
+                    last_failure_notification_time = datetime.now()
         
         print(f"{sleep_duration}秒待機します...")
         sleep(sleep_duration)
